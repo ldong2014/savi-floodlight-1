@@ -33,6 +33,8 @@ public class UDP extends BasePacket {
     public static Map<TransportPort, Class<? extends IPacket>> decodeMap;
     public static final TransportPort DHCP_CLIENT_PORT = TransportPort.of(68);
     public static final TransportPort DHCP_SERVER_PORT = TransportPort.of(67);
+    public static final TransportPort DHCPv6_CLIENT_PORT = TransportPort.of(546);
+    public static final TransportPort DHCPv6_SERVER_PORT = TransportPort.of(546);
     static {
         decodeMap = new HashMap<TransportPort, Class<? extends IPacket>>();
         /*
@@ -40,7 +42,8 @@ public class UDP extends BasePacket {
          */
         UDP.decodeMap.put(DHCP_CLIENT_PORT, DHCP.class);
         UDP.decodeMap.put(DHCP_SERVER_PORT, DHCP.class);
-
+        UDP.decodeMap.put(DHCPv6_CLIENT_PORT, DHCPv6.class);
+        UDP.decodeMap.put(DHCPv6_CLIENT_PORT, DHCPv6.class);
     }
 
     protected TransportPort sourcePort;

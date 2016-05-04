@@ -99,6 +99,7 @@ public class DHCP extends BasePacket {
     protected IPv4Address yourIPAddress;
     protected IPv4Address serverIPAddress;
     protected IPv4Address gatewayIPAddress;
+    protected IPv4Address requestedIP;
     protected MacAddress clientHardwareAddress;
     protected String serverName;
     protected String bootFileName;
@@ -110,6 +111,13 @@ public class DHCP extends BasePacket {
     public byte getOpCode() {
         return opCode;
     }
+    
+    /**
+     * @return requestedIP
+     */
+    public IPv4Address getRequestIP() {
+		return requestedIP;
+	}
 
     /**
      * @param opCode the opCode to set
@@ -454,6 +462,7 @@ public class DHCP extends BasePacket {
         this.yourIPAddress = IPv4Address.of(bb.getInt());
         this.serverIPAddress = IPv4Address.of(bb.getInt());
         this.gatewayIPAddress = IPv4Address.of(bb.getInt());
+        this.requestedIP = null;
         int hardwareAddressLength = 0xff & this.hardwareAddressLength;
         byte[] tmpMac = new byte[hardwareAddressLength];
         bb.get(tmpMac);
@@ -501,6 +510,9 @@ public class DHCP extends BasePacket {
             if (code == 255) {
                 // remaining bytes are supposed to be 0, but ignore them just in case
                 break;
+            }
+            if(code == 50){
+            	this.requestedIP = IPv4Address.of(option.getData());
             }
         }
 

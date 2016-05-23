@@ -146,7 +146,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 * @param pi
 	 * @param cntx
 	 */
-	private void processPacketIn(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
+	private Command processPacketIn(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
 		
 		OFPort inPort = (pi.getVersion().compareTo(OFVersion.OF_12) < 0 ? pi.getInPort()
 				: pi.getMatch().get(MatchField.IN_PORT));
@@ -182,6 +182,14 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		}
 		
 		decision.addToContext(cntx);
+		
+		if(routingAction == RoutingAction.NONE) {
+			return Command.STOP;
+		}
+		else {
+			return Command.CONTINUE;
+		}
+		
 	}
 	
 	/**
@@ -274,8 +282,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		switch (msg.getType()) {
 		case PACKET_IN:
-			processPacketIn(sw, (OFPacketIn) msg, cntx);
-			return Command.CONTINUE;
+			return processPacketIn(sw, (OFPacketIn) msg, cntx);
 		case ERROR:
 			log.info("ERROR");
 		default:

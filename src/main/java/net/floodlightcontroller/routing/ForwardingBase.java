@@ -47,6 +47,7 @@ import net.floodlightcontroller.util.OFDPAUtils;
 import net.floodlightcontroller.util.OFMessageDamper;
 import net.floodlightcontroller.util.TimedCache;
 
+import org.easymock.internal.matchers.Null;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
@@ -63,6 +64,7 @@ import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.MacAddress;
 import org.projectfloodlight.openflow.types.OFBufferId;
 import org.projectfloodlight.openflow.types.OFPort;
+import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.U64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +96,8 @@ public abstract class ForwardingBase implements IOFMessageListener {
 	
 	protected static boolean FLOOD_ALL_ARP_PACKETS = false;
 
+	protected static TableId tableId = null;
+	
 	protected IFloodlightProviderService floodlightProviderService;
 	protected IOFSwitchService switchService;
 	protected IDeviceService deviceManagerService;
@@ -254,6 +258,9 @@ public abstract class ForwardingBase implements IOFMessageListener {
 			.setCookie(cookie)
 			.setOutPort(outPort)
 			.setPriority(FLOWMOD_DEFAULT_PRIORITY);
+			
+			if(tableId != null)
+				fmb.setTableId(tableId);
 			
 			FlowModUtils.setActions(fmb, actions, sw);
 			

@@ -193,7 +193,8 @@ public class MatchUtils {
 			if (parent.isExact(mf)) {
 				mb.setExact(mf, parent.get(mf));
 			} else if (parent.isPartiallyMasked(mf)) {
-				mb.setMasked(mf, parent.getMasked(mf));
+				mb.setExact(mf, parent.get(mf));
+				//mb.setMasked(mf, parent.getMasked(mf));
 			} else {
 				// it's either exact, masked, or wildcarded
 				// itr only contains exact and masked MatchFields

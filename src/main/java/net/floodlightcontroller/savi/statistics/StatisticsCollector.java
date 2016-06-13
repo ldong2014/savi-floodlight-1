@@ -1,12 +1,11 @@
 package net.floodlightcontroller.savi.statistics;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,6 +15,8 @@ import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.sun.management.OperatingSystemMXBean;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -171,6 +172,7 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 		}
 		
 		Runtime runtime = Runtime.getRuntime();
+		OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
 		
 		restApiService.addRestletRoutable(new StatisticsWebRoutable());
 		
@@ -194,12 +196,13 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 				}
 				counter = (counter + 1) % COLLECTOR_TASK_INTERVAL;
 				
+				cpuSmaple.add(operatingSystemMXBean.getProcessCpuLoad());
+				memorySample.add(runtime.totalMemory()-runtime.freeMemory());
+				
 				if(counter == 0) {
 					
-					System.out.println("MEM:"+(runtime.totalMemory()-runtime.freeMemory()));
-					//OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
-					//System.out.println(operatingSystemMXBean.getCommittedVirtualMemorySize());
-					//System.out.println(operatingSystemMXBean.getProcessCpuLoad());
+					cpuSmaple.clear();
+					memorySample.clear();				
 				}
 				
 				updateTask.reschedule(UPDATE_TASK_INTERVAl, TimeUnit.MILLISECONDS);
@@ -215,7 +218,7 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 		for(OFType type: STATISTICS_RECORD_TYPES.keySet()) {
 			pairs.add(new KeyValuePair(STATISTICS_RECORD_TYPES.get(type), ""+collector.get(type).getLastAverage()));
 		}
-		
+		//System.out.println(""+cpuSmaple.getAverage());
 		pairs.add(new KeyValuePair("CPU", ""+cpuSmaple.getAverage()));
 		pairs.add(new KeyValuePair("MEMORY", ""+memorySample.getAverage()));
 		

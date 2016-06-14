@@ -188,7 +188,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		decision.addToContext(cntx);
 		
 		if(routingAction == RoutingAction.NONE) {
-			return Command.STOP;
+			return Command.CONTINUE;
 		}
 		else {
 			return Command.CONTINUE;
@@ -360,8 +360,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		{
 			Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
-			mb.setExact(MatchField.ETH_TYPE, EthType.IPv6);
-			protocolRules.add(mb.build());
+			// mb.setExact(MatchField.ETH_TYPE, EthType.IPv6);
+			// protocolRules.add(mb.build());
 		
 			mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
 			mb.setExact(MatchField.ETH_TYPE, EthType.IPv4);
@@ -403,10 +403,9 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					switch(update.getOperation()){
 					case PORT_UP:
 						if(!topologyService.isEdge(update.getSrc(), update.getSrcPort())){
-							log.info("LOG");
 							List<OFInstruction> instructions = new ArrayList<>();
 							instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-							
+							log.info("UP");
 							Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
 							mb.setExact(MatchField.IN_PORT, update.getSrcPort());
 							
@@ -520,7 +519,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	protected RoutingAction process(SwitchPort switchPort, Ethernet eth){
 		MacAddress macAddress = eth.getSourceMACAddress();
 		
-		if(securityPort.contains(switchPort)){
+		if(securityPort.contains(switchPort) || !topologyService.isEdge(switchPort.getSwitchDPID(), switchPort.getPort())){
 			if(macAddress.isBroadcast()){
 				doFlood(switchPort, eth.serialize());
 				return RoutingAction.NONE;

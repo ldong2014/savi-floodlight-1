@@ -171,8 +171,8 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 			floodlightProviderService.addOFMessageListener(type, this);
 		}
 		
-		Runtime runtime = Runtime.getRuntime();
-		OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+		final Runtime runtime = Runtime.getRuntime();
+		final OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
 		
 		restApiService.addRestletRoutable(new StatisticsWebRoutable());
 		

@@ -24,9 +24,12 @@ import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.instruction.OFInstruction;
+import org.projectfloodlight.openflow.protocol.instruction.OFInstructionApplyActions;
+import org.projectfloodlight.openflow.protocol.instruction.OFInstructionMeter;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.meterband.OFMeterBand;
+import org.projectfloodlight.openflow.protocol.meterband.OFMeterBandDrop;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.EthType;
 import org.projectfloodlight.openflow.types.IPv4Address;
@@ -103,6 +106,9 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	static final long BAND_RATE = 10000;
 	
 	static final Logger log = LoggerFactory.getLogger(SAVIProviderService.class);
+	
+	
+	protected boolean ENABLE_METER_TABLE = false;
 	
 	/**
 	 * Floodlight service
@@ -376,6 +382,23 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			securityPort.add(switchPort);
 		}
 		
+		
+		
+		Map<String, String> configParameters = context.getConfigParams(this);
+		if(configParameters.containsKey("enable-meter-table")) {
+			if(configParameters.get("enable-meter-table").equals("YES")) {
+				ENABLE_METER_TABLE = true;
+			}
+			else {
+				ENABLE_METER_TABLE = false;
+			}
+		}
+		else {
+			ENABLE_METER_TABLE = false;
+		}
+		
+		
+		
 	} 
 
 	/**
@@ -434,28 +457,37 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			List<OFAction> actions = new ArrayList<>();
 			doFlowMod(switchId, TableId.of(0), match, actions, null, PROTOCOL_LAYER_PRIORITY);
 		}
-		// OFMeterBandDrop.Builder bandBuilder = OFFactories.getFactory(OFVersion.OF_13).meterBands().buildDrop().setRate(BAND_RATE);
-		// List<OFMeterBand> bands = new ArrayList<>();
-		// bands.add(bandBuilder.build());
 		
-		// doMeterMod(switchId, 1, bands);
+		if(ENABLE_METER_TABLE) {
+			OFMeterBandDrop.Builder bandBuilder = OFFactories.getFactory(OFVersion.OF_13).meterBands().buildDrop().setRate(BAND_RATE);
+			List<OFMeterBand> bands = new ArrayList<>();
+			bands.add(bandBuilder.build());
+			doMeterMod(switchId, 1, bands);
+		}
 		
 		for(Match match:serviceRules){
-			// List<OFInstruction> instructions = new ArrayList<OFInstruction>();
+			
 			List<OFAction> actions = new ArrayList<>();
 			
 			actions.add(OFFactories.getFactory(OFVersion.OF_13).actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 			
-			// OFInstructionMeter meter = OFFactories.getFactory(OFVersion.OF_13).instructions().buildMeter()
-			//    .setMeterId(1)
-			//    .build();
+			if(ENABLE_METER_TABLE) {
+				List<OFInstruction> instructions = new ArrayList<OFInstruction>();
+				OFInstructionMeter meter = OFFactories.getFactory(OFVersion.OF_13).instructions().buildMeter()
+						.setMeterId(1)
+						.build();
   
-			// OFInstructionApplyActions output = OFFactories.getFactory(OFVersion.OF_13).instructions().buildApplyActions().setActions(actions).build();
+				OFInstructionApplyActions output = OFFactories.getFactory(OFVersion.OF_13).instructions().buildApplyActions().setActions(actions).build();
 			
-			// instructions.add(meter);
-			// instructions.add(output);
+				instructions.add(meter);
+				instructions.add(output);
+				
+				doFlowMod(switchId, TableId.of(0), match, null, instructions, SERVICE_LAYER_PRIORITY);
+			}
+			else {
+				doFlowMod(switchId, TableId.of(0), match, actions, null, SERVICE_LAYER_PRIORITY);
+			}
 			
-			doFlowMod(switchId, TableId.of(0), match, actions, null, SERVICE_LAYER_PRIORITY);
 		}
 		
 		List<OFInstruction> instructions = new ArrayList<>();

@@ -76,6 +76,7 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 	protected IThreadPoolService threadPoolService;
 	protected IRestApiService restApiService;
 	
+	protected int statisticsTimer = 0;
 	
 	protected SingletonTask updateTask;
 	
@@ -193,6 +194,7 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 					for(OFType type:STATISTICS_RECORD_TYPES.keySet()) {
 						collector.get(type).clear();
 					}
+					statisticsTimer ++;
 				}
 				counter = (counter + 1) % COLLECTOR_TASK_INTERVAL;
 				
@@ -221,6 +223,7 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 		//System.out.println(""+cpuSmaple.getAverage());
 		pairs.add(new KeyValuePair("CPU", ""+cpuSmaple.getAverage()));
 		pairs.add(new KeyValuePair("MEMORY", ""+memorySample.getAverage()));
+		pairs.add(new KeyValuePair("TIME", ""+statisticsTimer));
 		
 		return pairs;
 	}

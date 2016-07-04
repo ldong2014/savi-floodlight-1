@@ -127,7 +127,28 @@ public class BindingManager {
 		}
 		return null;
 	}
-
+	
+	public boolean check(SwitchPort switchPort, IPAddress<?> address) {
+		Binding<?> binding = null;
+		if(address.getIpVersion() == IPVersion.IPv4) {
+			binding = ipv4Binding.get(address);
+		}
+		else {
+			binding = ipv6Binding.get(address);
+		}
+		
+		if(binding == null) {
+			return false;
+		}
+		
+		if(binding.getSwitchPort().equals(switchPort)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
 	public boolean check(SwitchPort switchPort, MacAddress macAddress, IPAddress<?> address) {
 		Binding<?> binding = null;
 		

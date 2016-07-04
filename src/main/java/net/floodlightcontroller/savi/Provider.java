@@ -96,6 +96,7 @@ import net.floodlightcontroller.topology.ITopologyService;
 public class Provider implements IFloodlightModule, IOFSwitchListener, 
 IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListener{
 	
+	
 	/**
 	 * Priority
 	 */
@@ -109,6 +110,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	
 	
 	protected boolean ENABLE_METER_TABLE = false;
+	
 	
 	/**
 	 * Floodlight service
@@ -126,8 +128,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	/**
 	 * Service
 	 */
-	private List<SAVIService> saviServices;
-	private BindingManager manager;
+	protected List<SAVIService> saviServices;
+	protected BindingManager manager;
 	
 	/**
 	 * rules 
@@ -137,8 +139,10 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	protected Set<SwitchPort> securityPort;
 	protected Queue<LDUpdate> updateQueue;
 	
+	protected static final boolean ENABLE_FAST_FLOOD = true;
+	
 	public static final int SAVI_PROVIDER_APP_ID = 1000;
-	public static final TableId FLOW_TABLE_ID = TableId.of(1);
+	public static TableId FLOW_TABLE_ID = TableId.of(1);
 	
 	public static int securityTableCounter = 0;
 	
@@ -156,7 +160,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 * @param pi
 	 * @param cntx
 	 */
-	private Command processPacketIn(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
+	protected Command processPacketIn(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
 		
 		OFPort inPort = (pi.getVersion().compareTo(OFVersion.OF_12) < 0 ? pi.getInPort()
 				: pi.getMatch().get(MatchField.IN_PORT));
@@ -193,12 +197,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		decision.addToContext(cntx);
 		
-		if(routingAction == RoutingAction.NONE) {
-			return Command.CONTINUE;
-		}
-		else {
-			return Command.CONTINUE;
-		}
+		return Command.CONTINUE;
 		
 	}
 	
@@ -377,7 +376,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		securityPort = new HashSet<>();
 		
 		{
-			// Pre-set security port.
+			// set security port.
 			SwitchPort switchPort = new SwitchPort(DatapathId.of(1L),OFPort.of(1));
 			securityPort.add(switchPort);
 		}
@@ -396,8 +395,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		else {
 			ENABLE_METER_TABLE = false;
 		}
-		
-		
 		
 	} 
 
@@ -422,13 +419,11 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 				// TODO Auto-generated method stub
 				while(updateQueue.peek() != null){
 					LDUpdate update = updateQueue.remove();
-					
 					switch(update.getOperation()){
 					case PORT_UP:
 						if(!topologyService.isEdge(update.getSrc(), update.getSrcPort())){
 							List<OFInstruction> instructions = new ArrayList<>();
 							instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-							log.info("UP");
 							Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
 							mb.setExact(MatchField.IN_PORT, update.getSrcPort());
 							
@@ -439,12 +434,12 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					}
 					
 				}
-				updateTask.reschedule(1, TimeUnit.SECONDS);
+				updateTask.reschedule(10, TimeUnit.MILLISECONDS);
 			}
 		});
-		updateTask.reschedule(1, TimeUnit.SECONDS);
+		updateTask.reschedule(100, TimeUnit.MILLISECONDS);
 	}
-
+	
 	/**
 	 * Listen switch add message.
 	 */
@@ -553,10 +548,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		if(securityPort.contains(switchPort) || !topologyService.isEdge(switchPort.getSwitchDPID(), switchPort.getPort())){
 			if(macAddress.isBroadcast()){
-				doFlood(switchPort, eth.serialize());
-				return RoutingAction.NONE;
-			}
-			else{
 				return RoutingAction.FORWARD_OR_FLOOD;
 			}
 		}
@@ -575,7 +566,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 				return RoutingAction.NONE;
 			}
 		}
-		if(eth.getEtherType() == EthType.IPv6){
+		else if(eth.getEtherType() == EthType.IPv6){
 			IPv6 ipv6 = (IPv6)eth.getPayload();
 			IPv6Address address = ipv6.getSourceAddress();
 			if(address.isUnspecified()){
@@ -586,6 +577,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					return RoutingAction.MULTICAST;
 				}
 				else{
+					
 					return RoutingAction.FORWARD_OR_FLOOD;
 				}
 				
@@ -625,6 +617,11 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 * @param data
 	 */
 	protected void doFlood(SwitchPort inSwitchPort, byte[] data){
+		if(ENABLE_FAST_FLOOD) {
+			doFastFlood(inSwitchPort, data);
+			return;
+		}
+		
 		Collection<? extends IDevice> tmp = deviceService.getAllDevices();
 		for (IDevice d : tmp) {
 			SwitchPort[] switchPorts = d.getAttachmentPoints();
@@ -634,6 +631,32 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 				}
 			}
 		}
+	}
+	
+	protected void doFastFlood(SwitchPort inPort, byte[] data) {
+		List<OFPort> ports = new ArrayList<>();
+		
+		IOFSwitch sw = switchService.getSwitch(inPort.getSwitchDPID());
+		
+		for(OFPort port: sw.getEnabledPortNumbers()) {
+			if(!port.equals(inPort.getPort())&&topologyService.isEdge(sw.getId(), port)) {
+				doPacketOut(new SwitchPort(inPort.getSwitchDPID(), port), data);
+			}
+		}
+		
+		for(DatapathId switchId: switchService.getAllSwitchDpids()) {
+			if(!switchId.equals(inPort.getSwitchDPID())) {
+				sw = switchService.getSwitch(switchId);
+				ports.clear();
+				
+				for(OFPort port: sw.getEnabledPortNumbers()) {
+					if(topologyService.isEdge(sw.getId(), port)) {
+						doPacketOut(new SwitchPort(switchId, port), data);
+					}
+				}
+			}
+		}
+		
 	}
 	
 	/**
@@ -814,6 +837,42 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		if(sw!= null){
 			sw.write(meterBuilder.build());
 		}
+	}
+	
+	/**
+	 * Do flow modification.
+	 * @param switchId
+	 * @param tableId
+	 * @param match
+	 * @param actions
+	 * @param instructions
+	 * @param priority
+	 */
+	protected void doFlowMod(DatapathId switchId,TableId tableId,Match match, List<OFAction> actions, List<OFInstruction> instructions,int priority, int hardTimeout,int idleTimeout){
+		OFFlowAdd.Builder fab = OFFactories.getFactory(OFVersion.OF_13).buildFlowAdd();
+		
+		fab.setCookie(cookie)
+		   .setTableId(tableId)
+		   .setHardTimeout(hardTimeout)
+		   .setIdleTimeout(idleTimeout)
+		   .setPriority(priority)
+		   .setBufferId(OFBufferId.NO_BUFFER)
+		   .setMatch(match);
+		
+		if(actions != null){
+			fab.setActions(actions);
+		}
+		
+		if(instructions != null){
+			fab.setInstructions(instructions);
+		}
+		
+		IOFSwitch sw = switchService.getSwitch(switchId);
+		
+		if(sw!= null){
+			sw.write(fab.build());
+		}
+		
 	}
 	
 	/**

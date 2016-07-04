@@ -212,6 +212,8 @@ public class StatisticsCollector implements IFloodlightModule, IOFMessageListene
 		});
 		
 		updateTask.reschedule(UPDATE_TASK_INTERVAl, TimeUnit.MILLISECONDS);
+		
+		
 	}
 	
 	@Override
@@ -301,6 +303,8 @@ class ReferenceInterger {
 		sum += 1;
 		average += 1;
 	}
+	
+	
 	
 	@Override
 	public String toString() {

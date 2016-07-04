@@ -63,10 +63,8 @@ public class DHCPService extends SAVIBaseService {
 			pool.addHardwareBinding(mac, switchPort);
 		}
 		
-		
 		switch(dhcp.getPacketType()){
 		case DHCPDISCOVER:
-			log.info("dis");
 			return processDiscover(switchPort, eth);
 		case DHCPOFFER:
 			return processOffer(switchPort, eth);
@@ -86,12 +84,18 @@ public class DHCPService extends SAVIBaseService {
 		return null;
 		
 	}
+	
 	protected RoutingAction processDiscover(SwitchPort switchPort,Ethernet eth){
 		
 		// Flood
 		List<Action> actions = new ArrayList<>();
 		actions.add(Action.ActionFactory.getFloodAction(switchPort.getSwitchDPID(), switchPort.getPort(), eth));
 		saviProvider.pushActions(actions);
+		
+		if(pool.getSwitchPort(eth.getSourceMACAddress()) == null) {
+			pool.addHardwareBinding(eth.getSourceMACAddress(), switchPort);
+		}
+		
 		return RoutingAction.NONE;
 	}
 	
@@ -104,8 +108,6 @@ public class DHCPService extends SAVIBaseService {
 		IPv4 ipv4 = (IPv4)eth.getPayload();
 		IPv4Address ipv4Address = ipv4.getSourceAddress();
 		
-		log.info("OFFERs");
-		
 		if(!pool.isContain(ipv4Address)){
 			Binding<IPv4Address> binding = new Binding<>();
 			binding.setAddress(ipv4Address);
@@ -114,13 +116,17 @@ public class DHCPService extends SAVIBaseService {
 			binding.setSwitchPort(switchPort);
 			
 			pool.addBinding(ipv4Address, binding);
-			
 			actions.add(ActionFactory.getBindIPv4Action(binding));
 		}
 		
-		actions.add(ActionFactory.getPacketOutAction(eth, 
+		if(pool.getSwitchPort(dstMac) == null) {
+			actions.add(ActionFactory.getFloodAction(switchPort, eth));
+		}
+		else {
+			actions.add(ActionFactory.getPacketOutAction(eth, 
 													 pool.getSwitchPort(dstMac),
 													 OFPort.CONTROLLER));
+		}
 		saviProvider.pushActions(actions);
 		
 		return RoutingAction.NONE;

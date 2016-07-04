@@ -45,6 +45,9 @@ public abstract class Action {
 		public static FloodAction getFloodAction(DatapathId switchId,OFPort inPort, Ethernet eth){
 			return new FloodAction(switchId, inPort, eth);
 		}
+		public static FloodAction getFloodAction(SwitchPort switchPort, Ethernet eth) {
+			return new FloodAction(switchPort.getSwitchDPID(),switchPort.getPort(),eth);
+		}
 		public static BindIPv4Action getBindIPv4Action(Binding<IPv4Address> binding) {
 			return new BindIPv4Action(binding);
 		}

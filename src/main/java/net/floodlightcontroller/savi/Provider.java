@@ -377,8 +377,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		{
 			// set security port.
-			SwitchPort switchPort = new SwitchPort(DatapathId.of(1L),OFPort.of(1));
-			securityPort.add(switchPort);
+			// SwitchPort switchPort = new SwitchPort(DatapathId.of(1L),OFPort.of(1));
+			// securityPort.add(switchPort);
 		}
 		
 		
@@ -422,19 +422,31 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					switch(update.getOperation()){
 					case PORT_UP:
 						if(!topologyService.isEdge(update.getSrc(), update.getSrcPort())){
+							securityPort.add(new SwitchPort(update.getSrc(), update.getSrcPort()));
 							List<OFInstruction> instructions = new ArrayList<>();
 							instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
 							Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
 							mb.setExact(MatchField.IN_PORT, update.getSrcPort());
-							
 							doFlowMod(update.getSrc(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 						}
 						break;
 					default:
 					}
+					for(DatapathId dpid:switchService.getAllSwitchDpids()) {
+						IOFSwitch sw = switchService.getActiveSwitch(dpid);
+						for(OFPort port:sw.getEnabledPortNumbers()) {
+							if(!topologyService.isEdge(dpid, port) && !securityPort.contains(new SwitchPort(dpid, port))) {
+								List<OFInstruction> instructions = new ArrayList<>();
+								instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
+								Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+								mb.setExact(MatchField.IN_PORT, port);
+								doFlowMod(dpid, TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
+							}
+						}
+					}
 					
 				}
-				updateTask.reschedule(10, TimeUnit.MILLISECONDS);
+				updateTask.reschedule(1000, TimeUnit.MILLISECONDS);
 			}
 		});
 		updateTask.reschedule(100, TimeUnit.MILLISECONDS);
@@ -545,11 +557,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 */
 	protected RoutingAction process(SwitchPort switchPort, Ethernet eth){
 		MacAddress macAddress = eth.getSourceMACAddress();
-		
 		if(securityPort.contains(switchPort) || !topologyService.isEdge(switchPort.getSwitchDPID(), switchPort.getPort())){
-			if(macAddress.isBroadcast()){
 				return RoutingAction.FORWARD_OR_FLOOD;
-			}
 		}
 		
 		if(eth.getEtherType() == EthType.IPv4){
@@ -589,6 +598,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		else if(eth.getEtherType() == EthType.ARP){
 			ARP arp = (ARP)eth.getPayload();
 			IPv4Address address = arp.getSenderProtocolAddress();
+			log.info("12344");
 			if(manager.check(switchPort, macAddress, address)){
 				return RoutingAction.FORWARD_OR_FLOOD;
 			}
@@ -598,6 +608,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			else {
 				return RoutingAction.NONE;
 			}
+			
 		}
 		return null;
 	}
@@ -682,18 +693,24 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		IOFSwitch sw = switchService.getActiveSwitch(switchPort.getSwitchDPID());
 		OFPort port = switchPort.getPort();
 		
-		OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
 		
-		List<OFAction> actions = new ArrayList<OFAction>();
-		actions.add(sw.getOFFactory().actions().output(port, Integer.MAX_VALUE));
-		
-		pob.setActions(actions)
-		   .setBufferId(OFBufferId.NO_BUFFER)
-		   .setData(data)
-		   .setInPort(OFPort.CONTROLLER);
-		
-		sw.write(pob.build());
-	
+		try {
+			OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
+			
+			List<OFAction> actions = new ArrayList<OFAction>();
+			actions.add(sw.getOFFactory().actions().output(port, Integer.MAX_VALUE));
+			
+			pob.setActions(actions)
+			   .setBufferId(OFBufferId.NO_BUFFER)
+			   .setData(data)
+			   .setInPort(OFPort.CONTROLLER);
+			
+			sw.write(pob.build());
+			
+		} catch (NullPointerException e) {
+			// TODO: handle exception
+			
+		}
 	}
 	
 	/**

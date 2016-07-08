@@ -2,6 +2,7 @@ package net.floodlightcontroller.savi;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -421,41 +422,54 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			@Override
 			public void run() {
 				// TODO Auto-generated method stub
-				while(updateQueue.peek() != null){
+				while(updateQueue.peek() != null) {
 					LDUpdate update = updateQueue.remove();
-					switch(update.getOperation()){
+					SwitchPort switchPort = new SwitchPort(update.getSrc(), update.getSrcPort());
+					switch(update.getOperation()) {
 					case PORT_UP:
-						if(!topologyService.isEdge(update.getSrc(), update.getSrcPort())){
-							securityPort.add(new SwitchPort(update.getSrc(), update.getSrcPort()));
-							List<OFInstruction> instructions = new ArrayList<>();
-							instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-							Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
-							mb.setExact(MatchField.IN_PORT, update.getSrcPort());
+						if(!topologyService.isEdge(switchPort.getSwitchDPID(),switchPort.getPort()) && !interSwitchPort.contains(switchPort)) {
+							interSwitchPort.add(switchPort);
+							List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+							Match.Builder mb = factory.buildMatch().setExact(MatchField.IN_PORT, update.getSrcPort());
+							
 							doFlowMod(update.getSrc(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 						}
 						break;
+						
+					case PORT_DOWN:
+						interSwitchPort.remove(switchPort);
+						
+						List<Action> actions = Collections.singletonList(ActionFactory.getClearPortBindingAction(Collections.singletonList(switchPort)));
+						for(SAVIService service:saviServices) {
+							service.pushActins(actions);
+						}
+						
+						break;
+						
 					default:
 						
 					}
-					for(DatapathId dpid:switchService.getAllSwitchDpids()) {
-						IOFSwitch sw = switchService.getActiveSwitch(dpid);
+				}
+				
+				for(DatapathId dpid:switchService.getAllSwitchDpids()) {
+					IOFSwitch sw = switchService.getActiveSwitch(dpid);
+					try {
 						for(OFPort port:sw.getEnabledPortNumbers()) {
-							
+						
 							SwitchPort switchPort = new SwitchPort(dpid, port);
-							
+						
 							if(!topologyService.isEdge(dpid, port) && !securityPort.contains(switchPort) && !interSwitchPort.contains(switchPort)) {
-								
 								interSwitchPort.add(switchPort);
-								
-								List<OFInstruction> instructions = new ArrayList<>();
-								instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
+								List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
 								Match.Builder mb = factory.buildMatch().setExact(MatchField.IN_PORT, port);
-								
+							
 								doFlowMod(dpid, TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 							}
 						}
 					}
-					
+					catch(NullPointerException e) {
+						
+					}
 				}
 				updateTask.reschedule(1000, TimeUnit.MILLISECONDS);
 			}
@@ -477,7 +491,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		}
 		
 		if(ENABLE_METER_TABLE) {
-			OFMeterBandDrop.Builder bandBuilder = OFFactories.getFactory(OFVersion.OF_13).meterBands().buildDrop().setRate(BAND_RATE);
+			OFMeterBandDrop.Builder bandBuilder = factory.meterBands().buildDrop().setRate(BAND_RATE);
 			List<OFMeterBand> bands = new ArrayList<>();
 			bands.add(bandBuilder.build());
 			doMeterMod(switchId, 1, bands);
@@ -485,19 +499,18 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		for(Match match:serviceRules){
 			
-			List<OFAction> actions = new ArrayList<>();
+			List<OFAction> actions = Collections.singletonList(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 			
-			actions.add(OFFactories.getFactory(OFVersion.OF_13).actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 			
 			if(ENABLE_METER_TABLE) {
 				List<OFInstruction> instructions = new ArrayList<OFInstruction>();
-				OFInstructionMeter meter = OFFactories.getFactory(OFVersion.OF_13).instructions().buildMeter()
+				
+				OFInstructionMeter meter = factory.instructions().buildMeter()
 						.setMeterId(1)
 						.build();
-  
-				OFInstructionApplyActions output = OFFactories.getFactory(OFVersion.OF_13).instructions().buildApplyActions().setActions(actions).build();
-			
 				instructions.add(meter);
+				
+				OFInstructionApplyActions output = OFFactories.getFactory(OFVersion.OF_13).instructions().buildApplyActions().setActions(actions).build();
 				instructions.add(output);
 				
 				doFlowMod(switchId, TableId.of(0), match, null, instructions, SERVICE_LAYER_PRIORITY);
@@ -508,23 +521,21 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			
 		}
 		
-		List<OFInstruction> instructions = new ArrayList<>();
-		instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+		List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+		Match.Builder mb = factory.buildMatch();
 		doFlowMod(switchId, TableId.of(0), mb.build(), null, instructions, 0);
 		
-		List<OFAction> actions = new ArrayList<>();
-		actions.add(OFFactories.getFactory(OFVersion.OF_13).actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
+		List<OFAction> actions = Collections.singletonList(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 		doFlowMod(switchId, FLOW_TABLE_ID, mb.build(), actions, null, 0);
 		
+		
+		instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
 		for(SwitchPort switchPort:securityPort){
 			if(switchPort.getSwitchDPID().equals(switchId)){
-				mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+				mb = factory.buildMatch();
 				mb.setExact(MatchField.IN_PORT, switchPort.getPort());
-					
-				instructions = new ArrayList<>();
-				instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-				doFlowMod(switchPort.getSwitchDPID(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
+				
+				doFlowMod(switchId, TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 			}
 		}
 	}
@@ -559,8 +570,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		// TODO Auto-generated method stub
 		
 	}
-	
-	
 	
 	/**
 	 * Process the frame
@@ -737,11 +746,11 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		IOFSwitch sw = switchService.getActiveSwitch(switchId);
 		
-		OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
+		OFPacketOut.Builder pob = factory.buildPacketOut();
 		
 		List<OFAction> actions = new ArrayList<OFAction>();
 		for(OFPort port:outPorts) {
-			actions.add(sw.getOFFactory().actions().output(port, Integer.MAX_VALUE));
+			actions.add(factory.actions().output(port, Integer.MAX_VALUE));
 		}
 		
 		pob.setActions(actions)
@@ -766,7 +775,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			return;
 		}
 		
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+		Match.Builder mb = factory.buildMatch();
 		mb.setExact(MatchField.ETH_SRC, binding.getMacAddress());
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv4);
 		mb.setExact(MatchField.IPV4_SRC, (IPv4Address)binding.getAddress());
@@ -790,14 +799,15 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		if(securityPort.contains(binding.getSwitchPort())){
 			return;
 		}
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+		
+		Match.Builder mb = factory.buildMatch();
 		mb.setExact(MatchField.ETH_SRC, binding.getMacAddress());
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv6);
 		mb.setExact(MatchField.IPV6_SRC, (IPv6Address)binding.getAddress());
 		mb.setExact(MatchField.IN_PORT, binding.getSwitchPort().getPort());
 		
 		List<OFInstruction> instructions = new ArrayList<>();
-		instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
+		instructions.add(factory.instructions().gotoTable(FLOW_TABLE_ID));
 		doFlowMod(binding.getSwitchPort().getSwitchDPID(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 	
 	}
@@ -809,10 +819,12 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	protected void doUnbindIPv4(UnbindIPv4Action action) {
 		manager.delBinding(action.getIpv4Address());
 		Binding<?> binding = action.getBinding();
+		
 		if(securityPort.contains(binding.getSwitchPort())){
 			return;
 		}
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+		
+		Match.Builder mb = factory.buildMatch();
 		mb.setExact(MatchField.ETH_SRC, binding.getMacAddress());
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv4);
 		mb.setExact(MatchField.IPV4_SRC, (IPv4Address)binding.getAddress());
@@ -832,7 +844,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		if(securityPort.contains(binding.getSwitchPort())){
 			return;
 		}
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
+		Match.Builder mb = factory.buildMatch();
 		mb.setExact(MatchField.ETH_SRC, binding.getMacAddress());
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv6);
 		mb.setExact(MatchField.IPV6_SRC, (IPv6Address)binding.getAddress());
@@ -879,7 +891,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 * @param priority
 	 */
 	protected void doFlowMod(DatapathId switchId,TableId tableId,Match match, List<OFAction> actions, List<OFInstruction> instructions,int priority, int hardTimeout,int idleTimeout){
-		OFFlowAdd.Builder fab = OFFactories.getFactory(OFVersion.OF_13).buildFlowAdd();
+		OFFlowAdd.Builder fab = factory.buildFlowAdd();
 		
 		fab.setCookie(cookie)
 		   .setTableId(tableId)
@@ -902,7 +914,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		if(sw!= null){
 			sw.write(fab.build());
 		}
-		
 	}
 	
 	/**
@@ -948,7 +959,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	 * @param match
 	 */
 	protected void doFlowRemove(DatapathId switchId, TableId tableId, Match match) {
-		OFFlowDelete.Builder fdb = OFFactories.getFactory(OFVersion.OF_13).buildFlowDelete();
+		OFFlowDelete.Builder fdb = factory.buildFlowDelete();
 		
 		fdb.setMatch(match)
 		   .setCookie(cookie)
@@ -971,12 +982,10 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		// TODO Auto-generated method stub
 		IOFSwitch sw = switchService.getActiveSwitch(switchPort.getSwitchDPID());
 		if(sw!=null){
-			Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
-			mb.setExact(MatchField.IN_PORT, switchPort.getPort());
+			Match match = factory.buildMatch().setExact(MatchField.IN_PORT, switchPort.getPort()).build();
+			List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
 			
-			List<OFInstruction> instructions = new ArrayList<>();
-			instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-			doFlowMod(switchPort.getSwitchDPID(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
+			doFlowMod(switchPort.getSwitchDPID(), TableId.of(0), match, null, instructions, BINDING_LAYER_PRIORITY);
 		}
 		return securityPort.add(switchPort);
 	}
@@ -987,9 +996,9 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	@Override
 	public boolean delSecurityPort(SwitchPort switchPort) {
 		// TODO Auto-generated method stub
-		Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
-		mb.setExact(MatchField.IN_PORT, switchPort.getPort());
-		doFlowRemove(switchPort.getSwitchDPID(), TableId.of(0), mb.build());
+		Match match = factory.buildMatch().setExact(MatchField.IN_PORT, switchPort.getPort()).build();
+
+		doFlowRemove(switchPort.getSwitchDPID(), TableId.of(0), match);
 		
 		return securityPort.remove(switchPort);
 	}

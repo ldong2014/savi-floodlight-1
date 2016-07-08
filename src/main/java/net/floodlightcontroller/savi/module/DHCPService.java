@@ -20,6 +20,7 @@ import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.routing.IRoutingDecision.RoutingAction;
+import net.floodlightcontroller.savi.SAVIContext;
 import net.floodlightcontroller.savi.action.Action;
 import net.floodlightcontroller.savi.action.ClearIPv4BindingAction;
 import net.floodlightcontroller.savi.action.ClearSwitchBindingAction;
@@ -50,7 +51,6 @@ public class DHCPService extends SAVIBaseService {
 		}
 		return false;
 	}
-	
 	
 	protected RoutingAction processDHCP(SwitchPort switchPort,Ethernet eth){
 		IPv4 ipv4 = (IPv4)eth.getPayload();
@@ -86,7 +86,6 @@ public class DHCPService extends SAVIBaseService {
 	}
 	
 	protected RoutingAction processDiscover(SwitchPort switchPort,Ethernet eth){
-		
 		// Flood
 		List<Action> actions = new ArrayList<>();
 		actions.add(Action.ActionFactory.getFloodAction(switchPort.getSwitchDPID(), switchPort.getPort(), eth));
@@ -139,7 +138,6 @@ public class DHCPService extends SAVIBaseService {
 		
 		MacAddress macAddress = eth.getSourceMACAddress();
 		IPv4Address ipv4Address = dhcp.getRequestIP();
-		log.info("REQUEST");
 		
 		if(pool.isContain(ipv4Address)){
 			if(pool.check(ipv4Address, macAddress)){
@@ -153,7 +151,6 @@ public class DHCPService extends SAVIBaseService {
 					saviProvider.pushActions(actions);
 					return RoutingAction.NONE;
 				}
-				
 			}
 			else{
 				return RoutingAction.NONE;
@@ -175,9 +172,8 @@ public class DHCPService extends SAVIBaseService {
 			
 			return RoutingAction.NONE;
 		}
-		
-
 	}
+	
 	protected RoutingAction  processAck(SwitchPort switchPort,Ethernet eth){
 		List<Action> actions = new ArrayList<>();
 		IPv4 ipv4 = (IPv4)eth.getPayload();
@@ -289,7 +285,7 @@ public class DHCPService extends SAVIBaseService {
 		
 		return array;
 	}
-
+	
 	@Override
 	public RoutingAction process(SwitchPort switchPort, Ethernet eth) {
 		// TODO Auto-generated method stub
@@ -297,7 +293,7 @@ public class DHCPService extends SAVIBaseService {
 	}
 	
 	@Override
-	public void checkDeadline(){
+	public void checkDeadline() {
 		List<Action> actions = new ArrayList<>();
 		for(Binding<IPv4Address> binding:pool.getAllBindings()){
 			if(binding.isLeaseExpired()){
@@ -308,5 +304,11 @@ public class DHCPService extends SAVIBaseService {
 		if(actions.size()>0){
 			saviProvider.pushActions(actions);
 		}
+	}
+
+	@Override
+	public RoutingAction process(SAVIContext context, Ethernet eth) {
+		// TODO Auto-generated method stub
+		return process(context.getInPort(), eth);
 	}
 }

@@ -22,6 +22,7 @@ import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv6;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.routing.IRoutingDecision.RoutingAction;
+import net.floodlightcontroller.savi.SAVIContext;
 import net.floodlightcontroller.savi.action.Action;
 import net.floodlightcontroller.savi.action.ClearIPv6BindingAction;
 import net.floodlightcontroller.savi.action.ClearPortBindingAction;
@@ -294,5 +295,10 @@ public class DHCPv6Service extends SAVIBaseService {
 		// TODO Auto-generated method stub
 		
 	}
-
+	
+	@Override
+	public RoutingAction process(SAVIContext context, Ethernet eth) {
+		// TODO Auto-generated method stub
+		return process(context.getInPort(), eth);
+	}
 }

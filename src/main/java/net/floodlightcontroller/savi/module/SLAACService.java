@@ -21,6 +21,7 @@ import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMPv6;
 import net.floodlightcontroller.packet.IPv6;
 import net.floodlightcontroller.routing.IRoutingDecision.RoutingAction;
+import net.floodlightcontroller.savi.SAVIContext;
 import net.floodlightcontroller.savi.action.Action;
 import net.floodlightcontroller.savi.action.Action.ActionFactory;
 import net.floodlightcontroller.savi.action.ClearIPv6BindingAction;
@@ -240,5 +241,11 @@ public class SLAACService extends SAVIBaseService {
 		if(actions.size()>0){
 			saviProvider.pushActions(actions);
 		}
+	}
+	
+	@Override
+	public RoutingAction process(SAVIContext context, Ethernet eth) {
+		// TODO Auto-generated method stub
+		return process(context.getInPort(), eth);
 	}
 }

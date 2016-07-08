@@ -13,6 +13,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.projectfloodlight.openflow.protocol.OFFactories;
+import org.projectfloodlight.openflow.protocol.OFFactory;
 import org.projectfloodlight.openflow.protocol.OFFlowAdd;
 import org.projectfloodlight.openflow.protocol.OFFlowDelete;
 import org.projectfloodlight.openflow.protocol.OFMessage;
@@ -137,6 +138,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	protected List<Match> serviceRules;
 	protected List<Match> protocolRules;
 	protected Set<SwitchPort> securityPort;
+	protected Set<SwitchPort> interSwitchPort;
+	
 	protected Queue<LDUpdate> updateQueue;
 	
 	protected static final boolean ENABLE_FAST_FLOOD = true;
@@ -146,11 +149,15 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	
 	public static int securityTableCounter = 0;
 	
+	protected static OFFactory factory;
+	
+	
 	/**
 	 * Static cookie 
 	 */
 	static {
 		AppCookie.registerApp(SAVI_PROVIDER_APP_ID, "Forwarding");
+		factory = OFFactories.getFactory(OFVersion.OF_13);
 	}
 	public static final U64 cookie = AppCookie.makeCookie(SAVI_PROVIDER_APP_ID, 0);
 	
@@ -167,8 +174,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 		IRoutingDecision decision = IRoutingDecision.rtStore.get(cntx, IRoutingDecision.CONTEXT_DECISION);
+		SAVIContext context = new SAVIContext(sw, pi, this);
 		
-		SwitchPort switchPort = new SwitchPort(sw.getId(), inPort);
 		RoutingAction routingAction = null;
 		
 		if (decision == null) {
@@ -180,7 +187,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		// SAVI service process
 			for(SAVIService s : saviServices) {
 				if (s.match(eth)) {
-					routingAction = s.process(switchPort, eth);
+					routingAction = s.process(context, eth);
 					break;
 				}
 			}
@@ -188,7 +195,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		// Process
 		if(routingAction == null) {
-			 routingAction = process(switchPort, eth);
+			 routingAction = process(context.getInPort(), eth);
 		}
 		
 		if(routingAction != null) {
@@ -198,7 +205,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		decision.addToContext(cntx);
 		
 		return Command.CONTINUE;
-		
 	}
 	
 	/**
@@ -219,8 +225,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	@Override
 	public boolean pushActions(List<Action> actions) {
 		// TODO Auto-generated method stub
-		for(Action action:actions){
-			switch(action.getType()){
+		for(Action action:actions) {
+			switch(action.getType()) {
 			case FLOOD:
 				doFlood((FloodAction)action);
 				break;
@@ -293,7 +299,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		case PACKET_IN:
 			return processPacketIn(sw, (OFPacketIn) msg, cntx);
 		case ERROR:
-			log.info("ERROR");
 		default:
 			break;
 		}
@@ -374,14 +379,13 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		}
 		
 		securityPort = new HashSet<>();
+		interSwitchPort = new HashSet<>();
 		
 		{
 			// set security port.
 			// SwitchPort switchPort = new SwitchPort(DatapathId.of(1L),OFPort.of(1));
 			// securityPort.add(switchPort);
 		}
-		
-		
 		
 		Map<String, String> configParameters = context.getConfigParams(this);
 		if(configParameters.containsKey("enable-meter-table")) {
@@ -431,15 +435,22 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 						}
 						break;
 					default:
+						
 					}
 					for(DatapathId dpid:switchService.getAllSwitchDpids()) {
 						IOFSwitch sw = switchService.getActiveSwitch(dpid);
 						for(OFPort port:sw.getEnabledPortNumbers()) {
-							if(!topologyService.isEdge(dpid, port) && !securityPort.contains(new SwitchPort(dpid, port))) {
+							
+							SwitchPort switchPort = new SwitchPort(dpid, port);
+							
+							if(!topologyService.isEdge(dpid, port) && !securityPort.contains(switchPort) && !interSwitchPort.contains(switchPort)) {
+								
+								interSwitchPort.add(switchPort);
+								
 								List<OFInstruction> instructions = new ArrayList<>();
 								instructions.add(OFFactories.getFactory(OFVersion.OF_13).instructions().gotoTable(FLOW_TABLE_ID));
-								Match.Builder mb = OFFactories.getFactory(OFVersion.OF_13).buildMatch();
-								mb.setExact(MatchField.IN_PORT, port);
+								Match.Builder mb = factory.buildMatch().setExact(MatchField.IN_PORT, port);
+								
 								doFlowMod(dpid, TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
 							}
 						}
@@ -548,6 +559,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		// TODO Auto-generated method stub
 		
 	}
+	
+	
 	
 	/**
 	 * Process the frame
@@ -1015,6 +1028,12 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	public void linkDiscoveryUpdate(List<LDUpdate> updateList) {
 		// TODO Auto-generated method stub
 		updateQueue.addAll(updateList);
+	}
+
+	@Override
+	public OFFactory getOFFactory() {
+		// TODO Auto-generated method stub
+		return factory;
 	}
 	
 }

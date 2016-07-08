@@ -96,8 +96,7 @@ import net.floodlightcontroller.topology.ITopologyService;
  *
  */
 public class Provider implements IFloodlightModule, IOFSwitchListener, 
-IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListener{
-	
+IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListener {
 	
 	/**
 	 * Priority
@@ -151,7 +150,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 	public static int securityTableCounter = 0;
 	
 	protected static OFFactory factory;
-	
 	
 	/**
 	 * Static cookie 
@@ -361,8 +359,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		threadPoolService	 = context.getServiceImpl(IThreadPoolService.class);
 		linkDiscoveryService = context.getServiceImpl(ILinkDiscoveryService.class);
 		
-		updateQueue = new ConcurrentLinkedQueue<>();
-		
+		updateQueue 		= new ConcurrentLinkedQueue<>();
 		saviServices 		= new ArrayList<>();
 		manager 			= new BindingManager();
 		
@@ -621,7 +618,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		else if(eth.getEtherType() == EthType.ARP){
 			ARP arp = (ARP)eth.getPayload();
 			IPv4Address address = arp.getSenderProtocolAddress();
-			log.info("12344");
 			if(manager.check(switchPort, macAddress, address)){
 				return RoutingAction.FORWARD_OR_FLOOD;
 			}
@@ -631,7 +627,6 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			else {
 				return RoutingAction.NONE;
 			}
-			
 		}
 		return null;
 	}

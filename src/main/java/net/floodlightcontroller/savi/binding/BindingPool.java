@@ -46,7 +46,9 @@ public class BindingPool<T extends IPAddress<?>>{
 	}
 	
 	public void delHardwareBinding(MacAddress macAddress){
-		hardwareBindingTable.remove(macAddress);
+		synchronized (hardwareBindingTable) {
+			hardwareBindingTable.remove(macAddress);
+		}
 	}
 	
 	public boolean isContain(MacAddress macAddress){

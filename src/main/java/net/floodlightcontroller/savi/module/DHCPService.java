@@ -294,6 +294,7 @@ public class DHCPService extends SAVIBaseService {
 	
 	@Override
 	public void checkDeadline() {
+		/*
 		List<Action> actions = new ArrayList<>();
 		for(Binding<IPv4Address> binding:pool.getAllBindings()){
 			if(binding.isLeaseExpired()){
@@ -301,9 +302,11 @@ public class DHCPService extends SAVIBaseService {
 				pool.delBinding(binding.getAddress());
 			}
 		}
+		
 		if(actions.size()>0){
 			saviProvider.pushActions(actions);
 		}
+		*/
 	}
 
 	@Override

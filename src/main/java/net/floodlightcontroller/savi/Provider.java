@@ -429,7 +429,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					case PORT_UP:
 						if(!topologyService.isEdge(switchPort.getSwitchDPID(),switchPort.getPort()) && !interSwitchPort.contains(switchPort)) {
 							interSwitchPort.add(switchPort);
-							List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+							List<OFInstruction> instructions = Collections.singletonList((OFInstruction)factory.instructions().gotoTable(FLOW_TABLE_ID));
 							Match.Builder mb = factory.buildMatch().setExact(MatchField.IN_PORT, update.getSrcPort());
 							
 							doFlowMod(update.getSrc(), TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
@@ -439,7 +439,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 					case PORT_DOWN:
 						interSwitchPort.remove(switchPort);
 						
-						List<Action> actions = Collections.singletonList(ActionFactory.getClearPortBindingAction(Collections.singletonList(switchPort)));
+						List<Action> actions = Collections.singletonList((Action)ActionFactory.getClearPortBindingAction(Collections.singletonList(switchPort)));
 						for(SAVIService service:saviServices) {
 							service.pushActins(actions);
 						}
@@ -460,7 +460,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 						
 							if(!topologyService.isEdge(dpid, port) && !securityPort.contains(switchPort) && !interSwitchPort.contains(switchPort)) {
 								interSwitchPort.add(switchPort);
-								List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+								List<OFInstruction> instructions = Collections.singletonList((OFInstruction)factory.instructions().gotoTable(FLOW_TABLE_ID));
 								Match.Builder mb = factory.buildMatch().setExact(MatchField.IN_PORT, port);
 							
 								doFlowMod(dpid, TableId.of(0), mb.build(), null, instructions, BINDING_LAYER_PRIORITY);
@@ -499,7 +499,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		
 		for(Match match:serviceRules){
 			
-			List<OFAction> actions = Collections.singletonList(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
+			List<OFAction> actions = Collections.singletonList((OFAction)factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 			
 			
 			if(ENABLE_METER_TABLE) {
@@ -521,11 +521,11 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 			
 		}
 		
-		List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+		List<OFInstruction> instructions = Collections.singletonList((OFInstruction)factory.instructions().gotoTable(FLOW_TABLE_ID));
 		Match.Builder mb = factory.buildMatch();
 		doFlowMod(switchId, TableId.of(0), mb.build(), null, instructions, 0);
 		
-		List<OFAction> actions = Collections.singletonList(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
+		List<OFAction> actions = Collections.singletonList((OFAction)factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
 		doFlowMod(switchId, FLOW_TABLE_ID, mb.build(), actions, null, 0);
 		
 		
@@ -983,7 +983,7 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		IOFSwitch sw = switchService.getActiveSwitch(switchPort.getSwitchDPID());
 		if(sw!=null){
 			Match match = factory.buildMatch().setExact(MatchField.IN_PORT, switchPort.getPort()).build();
-			List<OFInstruction> instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+			List<OFInstruction> instructions = Collections.singletonList((OFInstruction)factory.instructions().gotoTable(FLOW_TABLE_ID));
 			
 			doFlowMod(switchPort.getSwitchDPID(), TableId.of(0), match, null, instructions, BINDING_LAYER_PRIORITY);
 		}

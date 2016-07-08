@@ -9,7 +9,6 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.savi.action.Action;
 import net.floodlightcontroller.savi.binding.Binding;
-import sun.reflect.ReflectionFactory.GetReflectionFactoryAction;
 
 public interface SAVIProviderService extends IFloodlightService {
 	

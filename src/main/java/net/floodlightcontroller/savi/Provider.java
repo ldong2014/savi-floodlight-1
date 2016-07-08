@@ -529,7 +529,8 @@ IOFMessageListener, ITopologyListener, SAVIProviderService, ILinkDiscoveryListen
 		doFlowMod(switchId, FLOW_TABLE_ID, mb.build(), actions, null, 0);
 		
 		
-		instructions = Collections.singletonList(factory.instructions().gotoTable(FLOW_TABLE_ID));
+		instructions = Collections.singletonList((OFInstruction)factory.instructions().gotoTable(FLOW_TABLE_ID));
+		
 		for(SwitchPort switchPort:securityPort){
 			if(switchPort.getSwitchDPID().equals(switchId)){
 				mb = factory.buildMatch();
